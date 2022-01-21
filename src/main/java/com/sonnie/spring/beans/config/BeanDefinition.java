@@ -13,6 +13,10 @@ public class BeanDefinition {
 
     private Class type;
 
+    private ScopeEnum scope;
+
+    private boolean isLazy;
+
     public ScopeEnum getScope() {
         return scope;
     }
@@ -20,9 +24,6 @@ public class BeanDefinition {
     public void setScope(ScopeEnum scope) {
         this.scope = scope;
     }
-
-    private ScopeEnum scope;
-    private boolean isLazy;
 
     public Class getType() {
         return type;

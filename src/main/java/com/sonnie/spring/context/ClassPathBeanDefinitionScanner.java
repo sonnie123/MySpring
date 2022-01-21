@@ -30,21 +30,27 @@ public class ClassPathBeanDefinitionScanner {
         if (clazz.isAnnotationPresent(ComponentScan.class)) {
             //获取bean的扫描路径
             ComponentScan componentScan = (ComponentScan) clazz.getAnnotation(ComponentScan.class);
+            //获取扫描路径
             String[] path = componentScan.value();
+
+            //遍历扫描路径
             for (String p : path) {
                 p = p.replace(".", "/");
-                //获取类路径
+                //获取类加载器
                 ClassLoader classLoader = SonnieApplicationContext.class.getClassLoader();
+                //获取目录
                 File file = new File(classLoader.getResource(p).getFile());
                 if (file.isDirectory()) {
                     for (File f : file.listFiles()) {
-                        String absolutePath = getAbsolutePath(f);
+                        String classPath = getClassPath(f);
                         try {
-                            //通过类路径生成类对象
-                            Class<?> loadClass = classLoader.loadClass(absolutePath);
+                            //通过类路径获取类对象
+                            Class<?> loadClass = classLoader.loadClass(classPath);
+
+                            //通过@Component判断是否为spring bean
                             if (loadClass.isAnnotationPresent(Component.class)) {
-                                encapBeanDefinition(beanDefinitionMap, loadClass, getBeanName(loadClass));
-                                encapBeanPostProcessor(beanPostProcessorList, loadClass);
+                                registerBeanDefinition(beanDefinitionMap, loadClass, getBeanName(loadClass));
+                                registerBeanPostProcessor(beanPostProcessorList, loadClass);
                             }
                         } catch (ClassNotFoundException e) {
                             e.printStackTrace();
@@ -63,18 +69,37 @@ public class ClassPathBeanDefinitionScanner {
         }
     }
 
-    private void encapBeanPostProcessor(List<BeanPostProcessor> beanPostProcessorList, Class<?> loadClass) throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
-        //BeanPostProcessor
+    /**
+     * 注册beanPostProcessorList
+     *
+     * @param beanPostProcessorList
+     * @param loadClass
+     * @throws InstantiationException
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     * @throws NoSuchMethodException
+     */
+    private void registerBeanPostProcessor(List<BeanPostProcessor> beanPostProcessorList, Class<?> loadClass)
+            throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         if (BeanPostProcessor.class.isAssignableFrom(loadClass))
             beanPostProcessorList.add((BeanPostProcessor) loadClass.getConstructor().newInstance());
     }
 
-    private void encapBeanDefinition(Map<String, BeanDefinition> beanDefinitionMap, Class<?> loadClass, String beanName) {
-        //封装beanDefinition
+    /**
+     * 注册beanDefinition
+     *
+     * @param beanDefinitionMap
+     * @param loadClass
+     * @param beanName
+     */
+    private void registerBeanDefinition(Map<String, BeanDefinition> beanDefinitionMap, Class<?> loadClass, String beanName) {
+
         BeanDefinition beanDefinition = new BeanDefinition();
         beanDefinition.setType(loadClass);
+
         if (loadClass.isAnnotationPresent(Lazy.class))
             beanDefinition.setLazy(true);
+
         if (loadClass.isAnnotationPresent(Scope.class)) {
             Scope scope = (Scope) loadClass.getAnnotation(Scope.class);
             beanDefinition.setScope(scope.value());
@@ -84,16 +109,28 @@ public class ClassPathBeanDefinitionScanner {
         beanDefinitionMap.put(beanName, beanDefinition);
     }
 
+    /**
+     * 获取bean名称
+     *
+     * @param loadClass
+     * @return
+     */
     private String getBeanName(Class<?> loadClass) {
+
         Component component = loadClass.getAnnotation(Component.class);
-        //获取beanName
         String beanName = component.value();
         if ("".equals(beanName))
             beanName = Introspector.decapitalize(loadClass.getSimpleName());
         return beanName;
     }
 
-    private String getAbsolutePath(File f) {
+    /**
+     * 获取类路径
+     *
+     * @param f
+     * @return
+     */
+    private String getClassPath(File f) {
         String absolutePath = f.getAbsolutePath();
         absolutePath = absolutePath.substring(absolutePath.indexOf("com"), absolutePath.indexOf(".class"));
         //生成类路径
